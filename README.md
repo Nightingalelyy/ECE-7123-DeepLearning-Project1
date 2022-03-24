@@ -12,8 +12,8 @@ from NYU
 ResNet model trained and tested based on the database of CIFAR-10
 
 
-The file model_mixup_340e.pt is the trained ResNet model,
-the file resnet2.py is the origin code of the model, 
-running resnet2.py to reproduce the model trainning process.
+The file project1_model.pt is the trained ResNet model,
+the file project1_model.py is the origin code of the model, 
+running project1_model.py to reproduce the model trainning process.
 
 The test accuracy of the model is about 94%
