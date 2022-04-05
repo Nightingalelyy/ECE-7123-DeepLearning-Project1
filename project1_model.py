@@ -13,20 +13,6 @@ import torchvision.transforms as transforms
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-import torch.optim as optim
-import matplotlib.pyplot as plt
-import tqdm
-from torchtoolbox.tools import mixup_data, mixup_criterion
-import pickle
-
-class params:
-    def __init__(self):
-        self.batch_size = 32
-        self.n_epochs = 300
-        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-        self.lr = 0.01
-
-args = params()
 
 class BasicBlock(nn.Module):
 
@@ -91,138 +77,12 @@ class ResNet(nn.Module):
         # out = self.dropout(out)
         return out
 
-
-def train(model, trainloader, testloader, critierion, optimizer, scheduler, savepath='models/checkpoint/temp.pt'):
-    train_loss = np.zeros(args.n_epochs)
-    test_loss = np.zeros(args.n_epochs)
-    accuracy = np.zeros(args.n_epochs)
-    
-    acc = 0
-    
-    for epoch in range(args.n_epochs): 
-        model.train()
-        running_loss = 0.0
-        # count = 0
-        for i, data in enumerate(tqdm.tqdm(trainloader, 0)):
-            inputs, labels = data
-            inputs = inputs.to(args.device)
-            labels = labels.to(args.device)
-            inputs, labels_a, labels_b, lam = mixup_data(inputs, labels, alpha=0.2)
-            optimizer.zero_grad()
-            outputs = model(inputs)
-            loss = mixup_criterion(criterion, outputs, labels_a, labels_b, lam)
-            loss.backward()
-            optimizer.step()
-            train_loss[epoch] += loss.item()
-            running_loss += loss.item()
-            # if i % 50 == 49:    
-            #     # count+=1
-            #     print(f'[{epoch + 1}, {i + 1:5d}] loss: {running_loss / 50:.3f}')
-            #     running_loss = 0.0
-        train_loss[epoch]/=len(trainloader)
-        scheduler.step()
-        
-        model.eval()
-        correct = 0
-        total = 0
-        with torch.no_grad():
-          for tdata in testloader:
-            timages, tlabels = tdata
-            timages = timages.to(args.device)
-            tlabels = tlabels.to(args.device)
-            # calculate outputs by running images through the network
-            toutputs = model(timages)
-            # the class with the highest energy is what we choose as prediction
-            loss = criterion(toutputs, tlabels)
-            test_loss[epoch]+= loss.item()
-            _, predicted = torch.max(toutputs.data, 1)
-            total += tlabels.size(0)
-            correct += (predicted == tlabels).sum().item()
-        test_loss[epoch] = test_loss[epoch]/len(testloader)
-        accuracy[epoch] = correct / total
-        
-        if correct/total > acc:
-            acc = correct / total
-            torch.save(model.state_dict(), savepath)
-        print(f'#Epoch: {epoch}/{args.n_epochs}, Train Loss: {round(train_loss[epoch],2)}, Test Loss: {round(test_loss[epoch],2)} , Accuracy: {100 * correct / total} %')
-    
-    return [model, train_loss, test_loss, accuracy]
-
-
-def test(model, testloader):
-    correct = 0
-    total = 0
-    # since we're not training, we don't need to calculate the gradients for our outputs
-    with torch.no_grad():
-        for data in testloader:
-            images, labels = data
-            images = images.to(args.device)
-            labels = labels.to(args.device)
-            # calculate outputs by running images through the network
-            outputs = model(images)
-            # the class with the highest energy is what we choose as prediction
-            _, predicted = torch.max(outputs.data, 1)
-            total += labels.size(0)
-            correct += (predicted == labels).sum().item()
-    print(f'Accuracy of the network on the test images: {100 * correct / total} %')
+def project1_model():
+    return ResNet(BasicBlock, [4, 6, 8, 2])
 
 
 
 
-
-if __name__ == '__main__':
-    
-
-    
-    
-    train_transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.RandomCrop(32, padding=4),
-         transforms.RandomHorizontalFlip(0.1),
-         transforms.RandomVerticalFlip(0.1),
-         transforms.RandomGrayscale(0.1),
-         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-    
-    test_transform = transforms.Compose(
-        [transforms.ToTensor(),
-         transforms.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))])
-
-    trainset = torchvision.datasets.CIFAR10(root='./data', train=True,
-                                            download=True, transform=train_transform)
-    trainloader = torch.utils.data.DataLoader(trainset, batch_size=args.batch_size,
-                                              shuffle=True, num_workers=2)
-
-    testset = torchvision.datasets.CIFAR10(root='./data', train=False,
-                                            download=True, transform=test_transform)
-    testloader = torch.utils.data.DataLoader(testset, batch_size=args.batch_size,
-                                              shuffle=False, num_workers=2)
-
-    classes = ('plane', 'car', 'bird', 'cat',
-               'deer', 'dog', 'frog', 'horse', 'ship', 'truck')
-    
-    net = ResNet(BasicBlock, [4, 6, 8, 2])
-    pytorch_total_params = sum(p.numel() for p in net.parameters() if p.requires_grad)
-    print(pytorch_total_params)
-
-    if torch.cuda.is_available():
-      device = torch.device('cuda:0')
-      net.to(device)
-    
-    
-    criterion = nn.CrossEntropyLoss()
-    optimizer = optim.Adam(net.parameters(), lr=args.lr, betas=(0.9, 0.999), eps=1e-8, weight_decay=1e-9)
-    scheduler = optim.lr_scheduler.StepLR(optimizer, step_size=5, gamma=0.95)
-
-    res = train(net, trainloader, testloader, criterion, optimizer, scheduler)   
-    trainedModel, train_loss, test_loss, accuracy_ = res
-    
-    pickle.dump(res, open('models/results/res','wb'))
-
-    plt.plot(train_loss, 'r-')
-    plt.plot(test_loss,'b-')
-    plt.legend(['train','test'])
-    plt.grid()
-    plt.show()
 
 
 
